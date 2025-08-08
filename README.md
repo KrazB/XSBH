@@ -75,9 +75,10 @@ docker-compose -f docker-compose.dev.yml up
 
 ## 📋 System Requirements
 
-- **Minimum:** 4GB RAM, 2GB free disk space
-- **Recommended:** 8GB RAM, 5GB free disk space
-- **Browser:** Chrome 90+, Firefox 88+, Edge 90+, Safari 14+
+- **Minimum:** 16GB RAM, 10GB free disk space for testing small files
+- **Recommended:** 32GB RAM, 400GB free disk space for testing large files
+- **Browser:** latest versions of Chrome, Firefox, or Edge,
+
 
 ## 🔧 Troubleshooting
 

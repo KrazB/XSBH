@@ -1,25 +1,27 @@
-version: '3.8'
-
 services:
-  xsbh-viewer:
-    build: .
-    container_name: xsbh-bim-viewer
+  xsbh-frontend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: xsbh-frontend
     ports:
-      - "8080:80"
+      - "8080:8080"
+    volumes:
+      - ./user-fragments:/app/data/fragments
+    restart: unless-stopped
+    depends_on:
+      - xsbh-backend
+
+  xsbh-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: xsbh-backend
+    ports:
+      - "8111:8111"
     volumes:
       - ./data:/app/data
       - ./user-fragments:/app/data/fragments
-    environment:
-      - NODE_ENV=production
-      - FRAGMENTS_DATA_DIR=/app/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-volumes:
-  user-fragments:
-    driver: local
+    environment:
+      - PYTHONUNBUFFERED=1

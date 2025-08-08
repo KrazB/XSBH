@@ -1,0 +1,9 @@
+services:  
+  xsbh-viewer:  
+    build: .  
+    container_name: xsbh-bim-viewer  
+    ports:  
+      - "8080:8080"  
+    volumes:  
+      - ./user-fragments:/app/data/fragments  
+    restart: unless-stopped 

@@ -1,0 +1,29 @@
+TEST: XSBH - BIM Fragment Viewer Ready for Testing | Quick Setup Instructions
+
+Dear Andy,
+
+I'm pleased to inform you that the XSBH (Cross-platform BIM Fragment Viewer) is now ready for your evaluation. This Docker-based application provides 3D visualization of BIM fragment files with an intuitive interface.
+
+**Quick Setup:**
+1. Install Docker Desktop: https://www.docker.com/products/docker-desktop/
+2. Clone repository: `git clone https://github.com/KrazB/XSBH.git`
+3. Run: Open in File Explorer and Double-click `start-xsbh.bat` or execute `docker-compose up -d` from your Windows PowerShell command prompt
+4. Access: http://localhost:8080
+
+**Key Features:**
+- In application IFC conversion
+- Drag & drop .frag file loading
+- 3D model navigation and visualization
+- Sample building models included for testing
+- Complete privacy (runs locally, no external data transfer)
+
+**Minium Requirements:** Windows 10/11, 32GB RAM (recommended), 100 GB free disk space
+
+**Complete Documentation:**
+For detailed installation instructions, troubleshooting, and usage guide, please see the README.md file in the repository: https://github.com/KrazB/XSBH/blob/main/README.md
+
+I'd appreciate your feedback on the installation process, performance, and overall user experience. Please feel free to reach out with any questions or if you'd like a brief demonstration.
+
+
+Best regards,
+Ken Buchanan and his AI Assistant
