@@ -19,7 +19,14 @@ import * as THREE from "three";
 import * as OBC from "@thatopen/components";
 import * as FRAGS from "@thatopen/fragments";
 
+// API Configuration - Dynamic hostname detection
+const API_CONFIG = {
+  // Use the same hostname as the frontend, but port 8111 for backend
+  BASE_URL: `http://${window.location.hostname}:8111`
+};
+
 console.log("🚀 QGEN_IMPFRAG Standalone Fragment Viewer initializing...");
+console.log(`🔧 API Base URL: ${API_CONFIG.BASE_URL}`);
 
 /**
  * Simple UI Manager for standalone fragment viewer
@@ -1930,7 +1937,7 @@ class FragmentViewer {
       statusElement.textContent = `🔄 Converting ${file.name}...`;
 
       // Send to backend for conversion
-      const response = await fetch('http://localhost:8111/api/convert', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/convert`, {
         method: 'POST',
         body: formData
       });
@@ -1957,7 +1964,7 @@ class FragmentViewer {
           try {
             if (progressText) progressText.textContent = 'Loading in 3D viewer...';
             
-            const fragmentResponse = await fetch(`http://localhost:8111/api/fragments/${result.output_file}`);
+            const fragmentResponse = await fetch(`${API_CONFIG.BASE_URL}/api/fragments/${result.output_file}`);
             if (fragmentResponse.ok) {
               const blob = await fragmentResponse.blob();
               const fragmentFile = new File([blob], result.output_file, { type: "application/octet-stream" });
