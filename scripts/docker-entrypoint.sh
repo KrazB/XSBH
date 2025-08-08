@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 # Docker entrypoint script for QGEN_IMPFRAG
