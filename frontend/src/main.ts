@@ -696,77 +696,52 @@ class FragmentViewer {
     try {
       console.log(`🔄 Toggling visibility for category: ${category}`);
       
-      // Get the ItemsFinder component
-      const finder = this.components.get(OBC.ItemsFinder);
+      // Get the Classifier component for finding items by category
+      const classifier = this.components.get(OBC.Classifier);
       
       // Get the Hider component for visibility control
       const hider = this.components.get(OBC.Hider);
       
-      // Create a unique query name for this category
-      const queryName = `${category}_visibility_query`;
-      
-      // Remove existing query if it exists
-      if (finder.list.has(queryName)) {
-        finder.list.delete(queryName);
-      }
-      
-      // Create a new query for this category using regular expression
-      // Convert IFCWALL to /WALL/ pattern for flexible matching
-      const categoryPattern = new RegExp(category.replace('IFC', ''), 'i');
-      
-      console.log(`📋 Creating query with pattern: ${categoryPattern}`);
-      
-      finder.create(queryName, [
-        {
-          categories: [categoryPattern]
-        }
-      ]);
-      
-      // Get the query results
-      const finderQuery = finder.list.get(queryName);
-      if (!finderQuery) {
-        console.warn(`⚠️ Could not create query for ${category}`);
-        return;
-      }
-      
-      const result = await finderQuery.test();
+      // Find items by entity type (category)
+      // The classifier uses entity-based classification
+      const filter = { entities: [category] };
+      const result = classifier.find(filter);
       
       // Count total items found across all models
       let totalItems = 0;
       for (const modelId in result) {
         const itemIds = result[modelId];
-        totalItems += itemIds ? itemIds.length : 0;
+        totalItems += itemIds ? itemIds.size : 0;
       }
       
       console.log(`📊 Found ${totalItems} items for category ${category}`);
       console.log(`� Result structure:`, result);
       
       if (totalItems > 0) {
-        // Check current visibility state by checking if any items are currently hidden
-        const hiddenItems = await hider.get(false); // Get currently hidden items
+        // Check current visibility state using localStorage
+        const hiddenCategories = JSON.parse(localStorage.getItem('hiddenCategories') || '{}');
         
         // Check if our category items are currently hidden
-        let categoryCurrentlyHidden = false;
-        for (const modelId in result) {
-          const categoryItemIds = result[modelId];
-          if (categoryItemIds && hiddenItems[modelId]) {
-            // Check if any of our category items are in the hidden list
-            const hiddenItemsSet = new Set(hiddenItems[modelId]);
-            categoryCurrentlyHidden = categoryItemIds.some(id => hiddenItemsSet.has(id));
-            if (categoryCurrentlyHidden) break;
-          }
-        }
+        let categoryCurrentlyHidden = hiddenCategories[category] || false;
         
-        console.log(`� Category ${category} currently hidden: ${categoryCurrentlyHidden}`);
+        console.log(`Category ${category} currently hidden: ${categoryCurrentlyHidden}`);
         
         if (categoryCurrentlyHidden) {
           // Show the category items
           await hider.set(true, result);
-          console.log(`�️ Showed ${totalItems} ${category} items`);
+          // Update localStorage
+          const hiddenCategories = JSON.parse(localStorage.getItem('hiddenCategories') || '{}');
+          delete hiddenCategories[category];
+          localStorage.setItem('hiddenCategories', JSON.stringify(hiddenCategories));
+          console.log(`Showed ${totalItems} ${category} items`);
         } else {
           // Hide the category items
           await hider.set(false, result);
-          console.log(`🙈 Hid ${totalItems} ${category} items`);
+          // Update localStorage
+          const hiddenCategories = JSON.parse(localStorage.getItem('hiddenCategories') || '{}');
+          hiddenCategories[category] = true;
+          localStorage.setItem('hiddenCategories', JSON.stringify(hiddenCategories));
+          console.log(`Hid ${totalItems} ${category} items`);
         }
         
         // Force render update
@@ -1618,11 +1593,10 @@ class FragmentViewer {
 
       // Read file as ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
-      const buffer = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer);
-      console.log(`📊 Fragment data size: ${buffer.length} bytes`);
+      console.log(`📊 Fragment data size: ${arrayBuffer.byteLength} bytes`);
 
       // Load fragment using FragmentsModels (returns a FragmentsModel)
-      const model = await this.fragments.load(buffer, { modelId: file.name });
+      const model = await this.fragments.load(arrayBuffer, { modelId: file.name });
       if (!model) throw new Error("Failed to create fragment model");
 
       // Add to loadedModels for UI management
@@ -1674,7 +1648,7 @@ class FragmentViewer {
     const startTime = Date.now();
     const checkInterval = 50; // Check every 50ms
     
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const checkReady = () => {
         const elapsedTime = Date.now() - startTime;
         

@@ -1,100 +1,125 @@
-# XSBH - Cross-platform BIM Fragment Viewer
-# Lightweight Docker image for local deployment
+# Production Multi-stage Dockerfile
+# Optimized for security, performance, and minimal attack surface
 
-FROM node:18-alpine AS builder
-
-# Install system dependencies
-RUN apk add --no-cache \
-    python3 \
-    py3-pip \
-    build-base \
-    python3-dev \
-    linux-headers
-
-# Set working directory
+# ============================================
+# Stage 1: Base Node.js for Frontend Build
+# ============================================
+FROM node:18-alpine AS base
 WORKDIR /app
+RUN apk add --no-cache git
 
-# Copy package files
-COPY frontend/package.json frontend/package-lock.json* ./frontend/
-COPY backend/package.json backend/requirements.txt ./backend/
+# ============================================
+# Stage 2: Frontend Dependencies
+# ============================================
+FROM base AS frontend-deps
+COPY frontend/package*.json ./
+RUN npm ci --only=production --no-audit --prefer-offline
 
-# Install frontend dependencies
-WORKDIR /app/frontend
-RUN npm ci
-
-# Install backend dependencies
-WORKDIR /app/backend
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
-
-# Copy source code
-WORKDIR /app
-COPY frontend/ ./frontend/
-COPY backend/ ./backend/
-COPY data/ ./data/
-
-# Build frontend
-WORKDIR /app/frontend
+# ============================================
+# Stage 3: Frontend Build
+# ============================================
+FROM frontend-deps AS frontend-build
+COPY frontend/ .
 RUN npm run build
 
-# ================================
-# Production Image
-# ================================
-FROM python:3.11-alpine AS production
+# ============================================
+# Stage 4: Frontend Production
+# ============================================
+FROM nginx:alpine AS frontend-prod
+# Install security updates
+RUN apk update && apk upgrade && apk add --no-cache \
+    curl \
+    && rm -rf /var/cache/apk/*
 
-# Install runtime dependencies
-RUN apk add --no-cache \
+# Create non-root user
+RUN addgroup -g 1001 -S nginxgroup && \
+    adduser -S nginxuser -u 1001 -G nginxgroup
+
+COPY --from=frontend-build /app/dist /usr/share/nginx/html
+COPY docker/nginx.prod.conf /etc/nginx/nginx.conf
+
+# Set proper permissions
+RUN chown -R nginxuser:nginxgroup /usr/share/nginx/html && \
+    chown -R nginxuser:nginxgroup /var/cache/nginx && \
+    chown -R nginxuser:nginxgroup /var/log/nginx && \
+    chown -R nginxuser:nginxgroup /etc/nginx/conf.d
+
+# Create PID directory
+RUN mkdir -p /var/run/nginx && \
+    chown -R nginxuser:nginxgroup /var/run/nginx
+
+USER nginxuser
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
+
+# ============================================
+# Stage 5: Python Base for Backend
+# ============================================
+FROM python:3.11-alpine AS python-base
+WORKDIR /app
+
+# Install system dependencies and security updates
+RUN apk update && apk upgrade && apk add --no-cache \
+    gcc \
+    musl-dev \
+    linux-headers \
     nodejs \
     npm \
-    nginx \
-    supervisor \
-    curl
+    bash \
+    curl \
+    && rm -rf /var/cache/apk/*
 
-# Create application structure
-WORKDIR /app
-RUN mkdir -p \
-    /app/backend \
-    /app/frontend/dist \
-    /app/data/fragments \
-    /app/data/ifc \
-    /app/logs \
-    /var/log/nginx \
-    /var/lib/nginx/tmp \
-    /run/nginx
+# Create non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
 
-# Copy built application
-COPY --from=builder /app/backend /app/backend
-COPY --from=builder /app/frontend/dist /app/frontend/dist
-COPY --from=builder /app/data /app/data
+# ============================================
+# Stage 6: Backend Dependencies
+# ============================================
+FROM python-base AS backend-deps
+COPY backend/requirements.txt .
+COPY backend/package*.json ./
 
-# Copy configuration files
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY scripts/docker-entrypoint.sh /usr/local/bin/
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    npm ci --only=production --no-audit
 
-# Set permissions
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
-    chown -R nginx:nginx /var/log/nginx /var/lib/nginx /run/nginx && \
-    chmod -R 755 /app
+# ============================================
+# Stage 7: Backend Production
+# ============================================
+FROM backend-deps AS backend-prod
 
-# Install Python dependencies in production
-WORKDIR /app/backend
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+# Copy application code
+COPY backend/ .
+COPY --chown=appuser:appgroup data/ ./data/
 
-# Set environment variables
-ENV PYTHONPATH=/app/backend
-ENV NODE_ENV=production
-ENV FRAGMENTS_DATA_DIR=/app/data
+# Set proper permissions
+RUN chown -R appuser:appgroup /app && \
+    chmod +x /app/*.py
 
-# Expose port
-EXPOSE 80
+# Create required directories
+RUN mkdir -p /app/logs /app/uploads && \
+    chown -R appuser:appgroup /app/logs /app/uploads
+
+USER appuser
+
+EXPOSE 5000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:80/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:5000/health', timeout=5)" || exit 1
 
-# Volume for data persistence
-VOLUME ["/app/data"]
+# Production entrypoint
+CMD ["python", "app.py"]
 
-# Start the application
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# ============================================
+# Security Labels
+# ============================================
+LABEL maintainer="XQG4_AXIS Team"
+LABEL version="1.0.0"
+LABEL description="XSBH Production BIM Fragment Viewer"
+LABEL security.scan="enabled"
