@@ -125,9 +125,3 @@ XSBH/
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 💬 Support
-
-For issues and questions:
-- Create an issue on GitHub
-- Check the troubleshooting section above
-- Review Docker Desktop documentation
